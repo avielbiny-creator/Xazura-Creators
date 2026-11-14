@@ -1,3 +1,5 @@
+import re
+
 import db
 from config import CHANNEL, COMMENT_STATUSES, EXCHANGE_STATUSES, LEVELS, METHODS, SUPPORT_BOT, VIDEO_STATUSES
 from utils import date, esc, fmt, level_info, min_total, min_video, money, top_rewards
@@ -426,13 +428,43 @@ def rejected(code: str, reason: str) -> str:
 
 # ---------- заявка за комментарии ----------
 
+HASHTAGS = ["#физ", "#тгаккаунт", "#вирт", "#второйаккаунт", "#тгакки", "#физномер", "#анонимныйномер"]
+
+COMMENT_EXAMPLES = [
+    f"просто красавчики, спс за физак {CHANNEL}",
+    f"лучшие {CHANNEL}",
+    f"спасибо {CHANNEL}",
+    f"легенды, +1 топ {CHANNEL}",
+    f"{CHANNEL} всё же будет лучше",
+    f"{CHANNEL} всё чётко",
+    f"{CHANNEL} >>>",
+    f"прикиньте, {CHANNEL} подарил",
+    f"советую кста {CHANNEL}",
+    f"у меня от {CHANNEL}, всё норм",
+    f"не благодарите {CHANNEL}",
+    f"у меня тоже есть {CHANNEL}",
+    f"люблю их {CHANNEL} ❤️",
+    f"видел тут {CHANNEL}",
+    f"кому {CHANNEL}?",
+    f"{CHANNEL} у них",
+    f"от {CHANNEL}, спасибо",
+    f"физа {CHANNEL}",
+]
+
+
 def comments_start() -> str:
+    tags = " ".join(f"<code>{t}</code>" for t in HASHTAGS)
     return (
         "💬 <b>Заявка за комментарии</b>\n\n"
-        f"📌 <b>Условия:</b>\n{comment_rules()}\n\n"
-        f"📸 Отправь скриншоты комментариев, минимум <b>{comments_min()}</b>, по одному на комментарий. "
-        "Можно пачками до 10 штук.\n"
-        "Одобренные комментарии зачислим на баланс, их можно обменять во вкладке «🔄 Обменять комментарии»."
+        "<b>Как это работает</b>\n"
+        f"1. В поиске TikTok вбей любой хештег: {tags}\n"
+        f"2. Пиши комментарии с <b>{CHANNEL}</b> под видео, лучше под свежими\n"
+        "3. Делай скриншот каждого комментария\n"
+        f"4. Отправь сюда минимум <b>{comments_min()}</b> скриншотов (можно пачками до 10), "
+        "затем запись истории комментариев\n\n"
+        "Тексты бери в «📝 Примеры комментариев». Одобренные комментарии зачислим на баланс, "
+        "их можно обменять в «🔄 Обменять комментарии».\n\n"
+        f"<b>📌 Правила</b>\n<blockquote expandable>{comment_rules()}</blockquote>"
     )
 
 
@@ -464,8 +496,17 @@ def records_received(n: int) -> str:
     return f"✅ Принято записей: <b>{n}</b>. Отправь ещё или нажми «✅ Отправить заявку»."
 
 
-def examples(text: str) -> str:
-    return f"📝 <b>Примеры комментариев</b>\n\n{esc(text)}\n\n<i>Не забывай менять текст каждые 3 комментария.</i>"
+def examples(custom: str | None) -> str:
+    """custom — примеры, заданные админом (по строке на пример); иначе встроенные."""
+    # Номера «1.» из вставленного списка убираем, чтобы они не попадали в копируемый текст
+    items = [re.sub(r"^\d+[.)]\s*", "", line.strip()) for line in custom.splitlines() if line.strip()] \
+        if custom else COMMENT_EXAMPLES
+    lines = "\n".join(f"<code>{esc(item)}</code>" for item in items)
+    return (
+        f"📝 <b>Примеры комментариев</b>\n\n{lines}\n\n"
+        "<i>Нажми на текст, чтобы скопировать. Меняй текст каждые 3 комментария, "
+        "одинаковые TikTok удаляет.</i>"
+    )
 
 
 def comment_sent(app_id: int, count: int) -> str:

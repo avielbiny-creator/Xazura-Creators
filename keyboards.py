@@ -108,10 +108,9 @@ def done_kb(callback: str, text: str = "✅ Готово") -> InlineKeyboardMark
     return _with_cancel(b)
 
 
-def shots_start_kb(has_examples: bool) -> InlineKeyboardMarkup:
+def shots_start_kb() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
-    if has_examples:
-        b.button(text="📝 Примеры комментариев", callback_data="com:ex")
+    b.button(text="📝 Примеры комментариев", callback_data="com:ex")
     return _with_cancel(b)
 
 
