@@ -108,8 +108,9 @@ def done_kb(callback: str, text: str = "✅ Готово") -> InlineKeyboardMark
     return _with_cancel(b)
 
 
-def shots_start_kb() -> InlineKeyboardMarkup:
+def shots_kb() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
+    b.button(text="✅ Отправить заявку", callback_data="com:send")
     b.button(text="📝 Примеры комментариев", callback_data="com:ex")
     return _with_cancel(b)
 
