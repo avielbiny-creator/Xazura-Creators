@@ -44,17 +44,12 @@ async def begin(m: Message, state: FSMContext, user_id: int):
         return
     await state.set_state(Com.shots)
     await state.update_data(shots=[], dupes=0)
-    has_examples = bool(db.get_setting("comment_examples"))
-    await m.answer(texts.comments_start(), reply_markup=kb.shots_start_kb(has_examples))
+    await m.answer(texts.comments_start(), reply_markup=kb.shots_start_kb())
 
 
 @router.callback_query(F.data == "com:ex")
 async def examples(cb: CallbackQuery):
-    text = db.get_setting("comment_examples")
-    if not text:
-        await cb.answer("Примеров пока нет.", show_alert=True)
-        return
-    await cb.message.answer(texts.examples(text))
+    await cb.message.answer(texts.examples(db.get_setting("comment_examples")))
     await cb.answer()
 
 

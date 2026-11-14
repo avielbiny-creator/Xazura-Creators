@@ -636,8 +636,9 @@ async def examples_show(cb: CallbackQuery, state: FSMContext):
     await state.set_state(Adm.examples)
     await cb.message.answer(
         "📝 <b>Примеры комментариев</b>\n\n"
-        + (f"Сейчас:\n{esc(current)}\n\n" if current else "Сейчас примеров нет, кнопка у креаторов скрыта.\n\n")
-        + "Отправь новый текст примеров целиком (заменит старый), <code>-</code> чтобы убрать, /cancel для отмены.",
+        + (f"Сейчас свои:\n{esc(current)}\n\n" if current else "Сейчас стоят встроенные примеры.\n\n")
+        + "Отправь новые примеры, каждый с новой строки (заменят старые), "
+        "<code>-</code> чтобы вернуть встроенные, /cancel для отмены.",
         reply_markup=REPLY,
     )
     await cb.answer()
@@ -648,10 +649,10 @@ async def examples_set(m: Message, state: FSMContext):
     await state.clear()
     if m.text.strip() == "-":
         await db.del_setting("comment_examples")
-        await m.answer("✅ Примеры убраны.")
+        await m.answer("✅ Вернул встроенные примеры.")
         return
-    await db.set_setting("comment_examples", m.text.strip()[:3500])
-    await m.answer("✅ Примеры сохранены. Креаторы увидят кнопку «📝 Примеры комментариев» в разделе комментариев.")
+    await db.set_setting("comment_examples", m.text.strip()[:3000])
+    await m.answer("✅ Примеры сохранены.")
 
 
 # ---------- выгрузка в Excel ----------
