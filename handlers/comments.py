@@ -17,12 +17,10 @@ router.message.filter(F.chat.type == "private")
 router.callback_query.filter(F.message.chat.type == "private")
 
 MAX_SHOTS = 300
-MAX_RECORDS = 10
 
 
 class Com(StatesGroup):
     shots = State()
-    record = State()
 
 
 async def _drop_kb(cb: CallbackQuery):
@@ -44,7 +42,7 @@ async def begin(m: Message, state: FSMContext, user_id: int):
         return
     await state.set_state(Com.shots)
     await state.update_data(shots=[], dupes=0)
-    await m.answer(texts.comments_start(), reply_markup=kb.shots_start_kb())
+    await m.answer(texts.shots_progress(0), reply_markup=kb.shots_kb())
 
 
 @router.callback_query(F.data == "com:ex")
@@ -77,60 +75,21 @@ async def got_shot(m: Message, state: FSMContext):
         if await state.get_state() != Com.shots.state:
             return
         data = await state.get_data()
-        count, need = len(data["shots"]), texts.comments_min()
-        markup = kb.done_kb("com:next", "➡️ Дальше: запись экрана") if count >= need else kb.cancel_kb()
-        await m.answer(texts.shots_progress(count, need, data["dupes"]), reply_markup=markup)
+        await m.answer(texts.shots_progress(len(data["shots"]), data["dupes"]), reply_markup=kb.shots_kb())
 
     debounce(uid, ack)
 
 
-@router.callback_query(Com.shots, F.data == "com:next")
-async def shots_done(cb: CallbackQuery, state: FSMContext):
-    count, need = len((await state.get_data())["shots"]), texts.comments_min()
-    if count < need:
-        await cb.answer(f"Нужно минимум {need} скриншотов, сейчас {count}.", show_alert=True)
-        return
-    await state.set_state(Com.record)
-    await state.update_data(records=[])
-    await _drop_kb(cb)
-    await cb.message.answer(texts.COMMENT_RECORD, reply_markup=kb.cancel_kb())
-    await cb.answer()
-
-
-@router.message(Com.record, ~F.text.in_(kb.MENU_TEXTS))
-async def got_record(m: Message, state: FSMContext):
-    if m.video:
-        item = {"t": "video", "id": m.video.file_id, "rec": True}
-    elif m.document and (m.document.mime_type or "").startswith("video/"):
-        item = {"t": "document", "id": m.document.file_id, "rec": True}
-    else:
-        await m.answer(texts.RECORD_NOT_VIDEO)
-        return
-    uid = m.from_user.id
-    async with user_lock(uid):
-        records = (await state.get_data())["records"]
-        if len(records) >= MAX_RECORDS:
-            return
-        await state.update_data(records=records + [item])
-
-    async def ack():
-        if await state.get_state() != Com.record.state:
-            return
-        count = len((await state.get_data())["records"])
-        await m.answer(texts.records_received(count), reply_markup=kb.done_kb("com:send", "✅ Отправить заявку"))
-
-    debounce(uid, ack)
-
-
-@router.callback_query(Com.record, F.data == "com:send")
+@router.callback_query(Com.shots, F.data == "com:send")
 async def send_app(cb: CallbackQuery, state: FSMContext, bot: Bot):
     uid = cb.from_user.id
     async with user_lock(uid):
-        if await state.get_state() != Com.record.state:
+        if await state.get_state() != Com.shots.state:
             return await cb.answer()
         data = await state.get_data()
-        if not data["records"]:
-            await cb.answer("Сначала отправь запись экрана истории комментариев 🎥", show_alert=True)
+        count, need = len(data["shots"]), texts.comments_min()
+        if count < need:
+            await cb.answer(f"Нужно минимум {need} скриншотов, сейчас {count}.", show_alert=True)
             return
         if await db.pending_comment_of(uid):
             await state.clear()
@@ -140,8 +99,7 @@ async def send_app(cb: CallbackQuery, state: FSMContext, bot: Bot):
         # Пока креатор собирал заявку, часть скринов могла уйти в другую: убираем их, а не всю заявку
         taken = await db.shots_taken([s["uid"] for s in data["shots"]])
         shots = [s for s in data["shots"] if s["uid"] not in taken]
-        if len(shots) < texts.comments_min():
-            await state.set_state(Com.shots)
+        if len(shots) < need:
             await state.update_data(shots=shots, dupes=data["dupes"] + len(taken))
             await cb.answer(f"{len(taken)} скриншотов уже были в другой заявке. Дошли ещё и отправь снова.",
                             show_alert=True)
@@ -149,7 +107,7 @@ async def send_app(cb: CallbackQuery, state: FSMContext, bot: Bot):
         await state.clear()
         await _drop_kb(cb)
         count = len(shots)
-        app_id = await db.create_comment_app(uid, count, shots + data["records"])
+        app_id = await db.create_comment_app(uid, count, shots)
     await cb.message.answer(texts.comment_sent(app_id, count), reply_markup=kb.main_menu())
     await cb.answer()
     await notify_admins(bot, "c", app_id)
